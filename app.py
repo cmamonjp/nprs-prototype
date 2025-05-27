@@ -75,14 +75,8 @@ if uploaded_file is not None:
     mean_wkg = df.groupby('segment')['w_per_kg'].mean().round(2)
     st.write(mean_wkg)
 
-    # Calculate average W/kg by terrain
-    mean_wkg_by_terrain = df.groupby('segment')['w_per_kg'].mean().round(2)
-    
-    # Calculate overall average W/kg (excluding zeros already removed)
+    # Add overall average W/kg
     overall_mean_wkg = df['w_per_kg'].mean().round(2)
-    
-    # Display results with overall average included
-    st.write(mean_wkg_by_terrain)
     st.markdown(f"**Overall Average W/kg:** {overall_mean_wkg}")
     
     # Prepare dataframes by terrain
