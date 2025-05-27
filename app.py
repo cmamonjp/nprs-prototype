@@ -42,3 +42,11 @@ def parse_fit_to_df(fit_file):
     
     df['segment'] = df['gradient'].apply(classify_segment)
     return df
+
+if uploaded_file is not None:
+    with st.spinner('解析中...'):
+        df = parse_fit_to_df(uploaded_file)
+    st.write("=== カラム一覧 ===")
+    st.write(df.columns.tolist())
+    st.stop()  # ここで処理止めて中身確認
+
