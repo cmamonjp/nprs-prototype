@@ -4,10 +4,10 @@ import numpy as np
 import fitdecode
 import matplotlib.pyplot as plt
 
-st.title("🏃‍♂️ NRRS-P Prototype v0.5")
-st.markdown("Upload a FIT file to analyze power per kg with terrain segmentation and smoothing")
+st.title("🏃‍♂️ NRRS-P Prototype v0.6")
+st.markdown("One-shot analysis of FIT files with terrain classification")
 
-uploaded_file = st.file_uploader("📂 Upload FIT file", type=["fit"])
+uploaded_file = st.file_uploader("📂 Upload your FIT file", type=["fit"])
 
 def parse_fit_to_df(fit_file):
     records = []
@@ -55,49 +55,71 @@ if uploaded_file is not None:
         st.error("Failed to parse the file or missing required columns.")
         st.stop()
 
+    # Remove zero or less power values
+    df = df[df['power'] > 0].copy()
+
     df['w_per_kg'] = df['power'] / weight
 
-    # Calculate elapsed time in seconds from timestamp (assuming timestamp is datetime64)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    df = df.sort_values('timestamp').reset_index(drop=True)
-    df['elapsed_time_sec'] = (df['timestamp'] - df['timestamp'].iloc[0]).dt.total_seconds()
+    st.success("✅ Analysis completed!")
 
-    window_size = 10
+    st.subheader("=== Columns ===")
+    st.write(df.columns.tolist())
 
-    fig, axs = plt.subplots(4, 1, figsize=(12, 16), sharex=True)
+    st.subheader("📊 Data preview (first 100 rows)")
+    st.dataframe(df.head(100))
 
-    # Smooth the W/kg data for all terrain combined
-    df['w_per_kg_smooth'] = df['w_per_kg'].rolling(window=window_size, min_periods=1).mean()
+    # Terrain-wise average W/kg (NRRS-P)
+    st.subheader("🧮 Average W/kg by Terrain (NRRS-P)")
+    mean_wkg = df.groupby('segment')['w_per_kg'].mean().round(2)
+    st.write(mean_wkg)
 
-    # 1. All terrain combined
-    axs[0].scatter(df['elapsed_time_sec'], df['w_per_kg'], alpha=0.3, s=10, label='Raw Data')
-    axs[0].plot(df['elapsed_time_sec'], df['w_per_kg_smooth'], color='blue', linewidth=2, label='Smoothed')
-    axs[0].set_title('All Terrain')
-    axs[0].set_ylabel('Power per kg (W/kg)')
-    axs[0].legend()
-    axs[0].grid(True)
+    # Prepare dataframes by terrain
+    df_uphill = df[df['segment'] == 'uphill']
+    df_flat = df[df['segment'] == 'flat']
+    df_downhill = df[df['segment'] == 'downhill']
 
-    # 2~4. By terrain segments
-    for i, terrain in enumerate(['uphill', 'flat', 'downhill'], start=1):
-        terrain_df = df[df['segment'] == terrain].copy()
-        terrain_df['w_per_kg_smooth'] = terrain_df['w_per_kg'].rolling(window=window_size, min_periods=1).mean()
+    # Create a function for smoothed line (rolling mean)
+    def smooth(series, window=10):
+        return series.rolling(window=window, min_periods=1).mean()
 
-        axs[i].scatter(terrain_df['elapsed_time_sec'], terrain_df['w_per_kg'], alpha=0.3, s=10, label='Raw Data')
-        axs[i].plot(terrain_df['elapsed_time_sec'], terrain_df['w_per_kg_smooth'], color='red', linewidth=2, label='Smoothed')
-        axs[i].set_title(f'{terrain.capitalize()} Segment')
-        axs[i].set_ylabel('Power per kg (W/kg)')
-        axs[i].legend()
-        axs[i].grid(True)
+    # Plot integrated graph
+    st.subheader("📈 Integrated W/kg Scatter & Smoothed Line (All Terrain)")
 
-    axs[3].set_xlabel('Elapsed Time (sec)')
-
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.scatter(df.index, df['w_per_kg'], s=5, alpha=0.3, label='Raw Data')
+    ax.plot(smooth(df['w_per_kg']), color='red', linewidth=2, label='Smoothed')
+    ax.set_xlabel("Index")
+    ax.set_ylabel("W/kg")
+    ax.legend()
     st.pyplot(fig)
 
-    # Display average W/kg by terrain
-    st.subheader("🧮 Average Power per kg by Terrain Segment")
-    avg_wkg = df.groupby('segment')['w_per_kg'].mean().round(2)
-    st.write(avg_wkg)
+    # Plot by terrain
+    st.subheader("📈 W/kg Scatter & Smoothed Line by Terrain")
 
-    # Provide CSV download
+    terrains = {
+        'uphill': df_uphill,
+        'flat': df_flat,
+        'downhill': df_downhill,
+        'all': df
+    }
+    colors = {
+        'uphill': 'orange',
+        'flat': 'green',
+        'downhill': 'blue',
+        'all': 'red'
+    }
+
+    for terrain, data in terrains.items():
+        fig, ax = plt.subplots(figsize=(12, 4))
+        ax.scatter(data.index, data['w_per_kg'], s=10, alpha=0.3, label='Raw Data')
+        ax.plot(smooth(data['w_per_kg']), color=colors[terrain], linewidth=2, label='Smoothed')
+        ax.set_title(f"W/kg - {terrain.capitalize()}")
+        ax.set_xlabel("Index")
+        ax.set_ylabel("W/kg")
+        ax.legend()
+        st.pyplot(fig)
+
+    # CSV download
+    st.subheader("📁 Export CSV")
     csv_data = df.to_csv(index=False).encode('utf-8')
-    st.download_button("Download CSV", csv_data, file_name="nrrs_p_output.csv", mime="text/csv")
+    st.download_button("Download CSV", csv_data, file_name="nrrs_parsed.csv", mime="text/csv")
