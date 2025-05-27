@@ -4,13 +4,13 @@ import numpy as np
 import fitdecode
 import matplotlib.pyplot as plt
 
-st.title("🏃‍♂️ NRRS-P プロトタイプ v0.3")
-st.markdown("FITファイルから出力・地形分類・能力評価まで一発解析")
+st.title("🏃‍♂️ NRRS-P Prototype v0.4")
+st.markdown("From FIT file to terrain segmentation and power evaluation")
 
-uploaded_file = st.file_uploader("📂 FITファイルをアップロード", type=["fit"])
+uploaded_file = st.file_uploader("📂 Upload your FIT file", type=["fit"])
 
 # ----------------------------
-# FITファイル解析関数
+# Parse FIT file to DataFrame
 # ----------------------------
 def parse_fit_to_df(fit_file):
     records = []
@@ -23,21 +23,21 @@ def parse_fit_to_df(fit_file):
 
     df = pd.DataFrame(records)
 
-    # 必須カラムチェック
+    # Required columns
     required_cols = ['timestamp', 'enhanced_altitude', 'power', 'distance']
-    missing_cols = [c for c in required_cols if c not in df.columns]
-    if missing_cols:
-        st.error(f"必須カラムが足りません: {missing_cols}")
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        st.error(f"Missing columns: {missing}")
         return pd.DataFrame()
 
     df = df[required_cols].dropna()
 
-    # 勾配計算と地形分類
+    # Calculate gradient
     df['delta_altitude'] = df['enhanced_altitude'].diff()
     df['delta_distance'] = df['distance'].diff()
     df['gradient'] = df['delta_altitude'] / df['delta_distance'].replace(0, np.nan)
 
-    def classify_segment(g):
+    def classify(g):
         if g > 0.03:
             return 'uphill'
         elif g < -0.03:
@@ -45,67 +45,66 @@ def parse_fit_to_df(fit_file):
         else:
             return 'flat'
 
-    df['segment'] = df['gradient'].apply(classify_segment)
+    df['segment'] = df['gradient'].apply(classify)
 
     return df
 
 # ----------------------------
-# メイン処理
+# Main process
 # ----------------------------
 if uploaded_file is not None:
-    with st.spinner('解析中...'):
+    with st.spinner('Parsing FIT file...'):
         df = parse_fit_to_df(uploaded_file)
 
     if df.empty:
-        st.error("解析に失敗しました。ファイルやカラムの内容を確認してください。")
+        st.error("Parsing failed. Please check the input file.")
         st.stop()
 
-    st.success("✅ 解析完了！")
+    st.success("✅ Data loaded successfully!")
 
-    # ユーザー体重入力
-    st.subheader("⚖️ 体重を入力してください (kg)")
-    weight = st.number_input("体重 (kg)", min_value=30.0, max_value=120.0, value=60.0, step=0.5)
+    # Body weight input
+    st.subheader("⚖️ Enter your weight (kg)")
+    weight = st.number_input("Body weight", min_value=30.0, max_value=120.0, value=60.0, step=0.5)
 
-    # W/kg列を追加
+    # Add W/kg column
     df['w_per_kg'] = df['power'] / weight
 
-    # Power=0を除外（各種処理の前にやる）
+    # Filter out power == 0
     df = df[df['power'] > 0]
 
     if df.empty:
-        st.warning("出力（Power）が0のデータしか存在しませんでした。")
+        st.warning("Only power=0 data found. Nothing to analyze.")
         st.stop()
 
-    # カラム一覧表示
-    st.subheader("📋 カラム一覧")
+    # Column info
+    st.subheader("📋 Column names")
     st.write(df.columns.tolist())
 
-    # データ表示
-    st.subheader("📊 データ（先頭100件）")
+    # Show sample data
+    st.subheader("📊 Head of DataFrame (top 100)")
     st.dataframe(df.head(100))
 
-    # 地形別W/kg平均（Power=0は除外済み）
-    st.subheader("🧮 地形別 平均 W/kg (NRRS-P)")
+    # W/kg mean by terrain
+    st.subheader("🧮 Mean W/kg by terrain type")
     mean_wkg = df.groupby('segment')['w_per_kg'].mean().round(2)
     st.write(mean_wkg)
 
-    # 地形別にグラフ分割
-    st.subheader("📈 地形別 Power 時系列グラフ")
+    # Scatter plot by segment
+    st.subheader("📈 Scatter plot of Power by segment")
     for seg_type in ['uphill', 'flat', 'downhill']:
         seg = df[df['segment'] == seg_type].copy()
         if seg.empty:
             continue
-        # 累積時間を算出
         seg['elapsed_time'] = (seg['timestamp'] - seg['timestamp'].iloc[0]).dt.total_seconds()
         fig, ax = plt.subplots(figsize=(10, 3))
-        ax.plot(seg['elapsed_time'], seg['power'], label=f"{seg_type}")
-        ax.set_title(f"{seg_type.capitalize()} セグメント")
-        ax.set_xlabel("経過時間 (秒)")
+        ax.scatter(seg['elapsed_time'], seg['power'], s=3, alpha=0.6, label=seg_type, c='tab:blue')
+        ax.set_title(f"{seg_type.capitalize()} segment")
+        ax.set_xlabel("Elapsed time (sec)")
         ax.set_ylabel("Power (W)")
         ax.legend()
         st.pyplot(fig)
 
-    # CSV出力
-    st.subheader("📁 CSV出力")
+    # CSV download
+    st.subheader("📁 Export cleaned data")
     csv_data = df.to_csv(index=False).encode('utf-8')
-    st.download_button("CSVとして保存", csv_data, file_name="nrrs_p_cleaned.csv", mime="text/csv")
+    st.download_button("💾 Download CSV", csv_data, file_name="nrrs_p_cleaned.csv", mime="text/csv")
