@@ -83,11 +83,16 @@ if uploaded_file is not None:
     # 地形別平均W/kg表示
     mean_wkg = df.groupby('segment')['w_per_kg'].mean().round(2)
     overall_mean_wkg = df['w_per_kg'].mean().round(2)
-    mean_wkg = pd.concat([mean_wkg, pd.Series({'Overall': overall_mean_wkg})])
-    mean_wkg = mean_wkg.append(pd.Series({'Overall': overall_mean_wkg}))
+    
+    # SeriesをDataFrameに変換し、「Overall」行を追加
+    mean_wkg_df = mean_wkg.reset_index()
+    mean_wkg_df = mean_wkg_df.rename(columns={'segment': 'Terrain', 'w_per_kg': 'Avg W/kg'})
+    overall_row = pd.DataFrame({'Terrain': ['Overall'], 'Avg W/kg': [overall_mean_wkg]})
+    
+    mean_wkg_df = pd.concat([mean_wkg_df, overall_row], ignore_index=True)
     
     st.subheader("🧮 Average W/kg by Terrain (NRRS-P)")
-    st.write(mean_wkg)
+    st.dataframe(mean_wkg_df)
 
     # タイム経過を秒で計算（グラフのX軸に使う）
     df['timestamp'] = pd.to_datetime(df['timestamp'])
