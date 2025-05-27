@@ -83,6 +83,7 @@ if uploaded_file is not None:
     # 地形別平均W/kg表示
     mean_wkg = df.groupby('segment')['w_per_kg'].mean().round(2)
     overall_mean_wkg = df['w_per_kg'].mean().round(2)
+    mean_wkg = pd.concat([mean_wkg, pd.Series({'Overall': overall_mean_wkg})])
     mean_wkg = mean_wkg.append(pd.Series({'Overall': overall_mean_wkg}))
     
     st.subheader("🧮 Average W/kg by Terrain (NRRS-P)")
