@@ -76,20 +76,22 @@ if uploaded_file is not None:
     mean_wkg = {seg: segment_dfs[seg]['w_per_kg'].mean() if not segment_dfs[seg].empty else 0 for seg in segments}
     st.write({k: round(v, 2) for k, v in mean_wkg.items()})
 
-    st.subheader("📊 Terrain-wise Power (W/kg) Trend: Scatter & Smoothed Line")
+    st.subheader("📊 Terrain-wise Power (W/kg) Trend: Scatter & Smoothed Line + Average Line")
     fig, axs = plt.subplots(len(segments), 1, figsize=(12, 8), sharex=True)
     for i, seg in enumerate(segments):
         ax = axs[i]
         seg_df = segment_dfs[seg]
         if not seg_df.empty:
+            avg = seg_df['w_per_kg'].mean()
             ax.scatter(seg_df['elapsed_time_sec'], seg_df['w_per_kg'], s=5, alpha=0.4, label='Raw Data')
             ax.plot(seg_df['elapsed_time_sec'], seg_df['w_per_kg_smooth'], color='red', label='Smoothed')
+            ax.axhline(avg, color='red', linestyle='--', label=f'Average ({avg:.2f})')
             ax.set_ylabel(f"{seg.capitalize()} W/kg")
             ax.legend()
         else:
             ax.text(0.5, 0.5, f"No data for {seg}", ha='center', va='center')
             ax.set_ylabel(f"{seg.capitalize()} W/kg")
-
+    
     axs[-1].set_xlabel("Segment Elapsed Time (seconds)")
     plt.tight_layout()
     st.pyplot(fig)
