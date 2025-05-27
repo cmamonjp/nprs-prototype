@@ -4,7 +4,7 @@ import numpy as np
 import fitdecode
 import matplotlib.pyplot as plt
 
-st.title("🏃‍♂️ NRRS-P Prototype v0.6")
+st.title("🏃‍♂️ NRRS-P Prototype v0.7")
 st.markdown("One-shot analysis of FIT files with terrain classification")
 
 uploaded_file = st.file_uploader("📂 Upload your FIT file", type=["fit"])
@@ -92,7 +92,7 @@ if uploaded_file is not None:
     mean_wkg_df = pd.concat([mean_wkg_df, overall_row], ignore_index=True)
     
     st.subheader("🧮 Average W/kg by Terrain (NRRS-P)")
-    st.dataframe(mean_wkg_df)
+
     st.write(mean_wkg_df)
 
     # タイム経過を秒で計算（グラフのX軸に使う）
