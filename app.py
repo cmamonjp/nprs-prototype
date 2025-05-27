@@ -38,6 +38,12 @@ def parse_fit_to_df(fit_file):
 if uploaded_file is not None:
     with st.spinner('解析中...'):
         df = parse_fit_to_df(uploaded_file)
+
+        # 👇 追加：空DataFrameのときに処理停止
+        if df.empty:
+            st.error("❌ データが読み込めませんでした。FITファイルに必要な項目が含まれていない可能性があります。")
+            st.stop()
+
         st.success("✅ 解析完了！")
 
         st.subheader("📊 データ表示")
