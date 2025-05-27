@@ -19,6 +19,14 @@ def parse_fit_to_df(fit_file):
                 records.append(record)
 
     df = pd.DataFrame(records)
+    
+    st.write("=== カラム一覧 ===")
+    st.write(df.columns.tolist())
+    
+    # ここで一旦止めてカラムを確認するためにreturn
+    return df
+    
+    # 以下は本来の処理
     df = df[['timestamp', 'altitude', 'power', 'distance']].dropna()
     df['delta_altitude'] = df['altitude'].diff()
     df['delta_distance'] = df['distance'].diff()
@@ -34,30 +42,3 @@ def parse_fit_to_df(fit_file):
     
     df['segment'] = df['gradient'].apply(classify_segment)
     return df
-
-if uploaded_file is not None:
-    with st.spinner('解析中...'):
-        df = parse_fit_to_df(uploaded_file)
-
-        # 👇 追加：空DataFrameのときに処理停止
-        if df.empty:
-            st.error("❌ データが読み込めませんでした。FITファイルに必要な項目が含まれていない可能性があります。")
-            st.stop()
-
-        st.success("✅ 解析完了！")
-
-        st.subheader("📊 データ表示")
-        st.dataframe(df.head(100))
-
-        st.subheader("📈 出力（Power）と地形セグメントの可視化")
-        fig, ax = plt.subplots(figsize=(10, 4))
-        for seg_type in ['uphill', 'flat', 'downhill']:
-            seg = df[df['segment'] == seg_type]
-            ax.plot(seg['timestamp'], seg['power'], label=seg_type)
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Power (W)")
-        ax.legend()
-        st.pyplot(fig)
-
-        st.subheader("📁 CSV出力")
-        st.download_button("CSVとして保存", df.to_csv(index=False).encode(), file_name="nprs_parsed.csv", mime="text/csv")
