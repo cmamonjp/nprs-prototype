@@ -42,6 +42,11 @@ def parse_fit_to_df(fit_file):
 
     df['segment'] = df['gradient'].apply(classify_segment)
 
+    df['power'] = pd.to_numeric(df['power'], errors='coerce')
+    df = df.dropna(subset=['power'])
+    df = df[df['power'] > 0]
+    df = df.reset_index(drop=True)
+    
     return df
 
 if uploaded_file is not None:
