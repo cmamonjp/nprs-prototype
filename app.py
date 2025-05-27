@@ -87,17 +87,6 @@ if uploaded_file is not None:
     def smooth(series, window=10):
         return series.rolling(window=window, min_periods=1).mean()
 
-    # Plot integrated graph
-    st.subheader("📈 Integrated W/kg Scatter & Smoothed Line (All Terrain)")
-
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.scatter(df.index, df['w_per_kg'], s=5, alpha=0.3, label='Raw Data')
-    ax.plot(smooth(df['w_per_kg']), color='red', linewidth=2, label='Smoothed')
-    ax.set_xlabel("Index")
-    ax.set_ylabel("W/kg")
-    ax.legend()
-    st.pyplot(fig)
-
     # Plot by terrain
     st.subheader("📈 W/kg Scatter & Smoothed Line by Terrain")
 
