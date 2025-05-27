@@ -4,7 +4,7 @@ import numpy as np
 import fitdecode
 import matplotlib.pyplot as plt
 
-st.title("🏃‍♂️ NRRS-P Prototype v0.7")
+st.title("🏃‍♂️ NRRS-P Prototype v0.8")
 st.markdown("One-shot analysis of FIT files with terrain classification")
 
 uploaded_file = st.file_uploader("📂 Upload your FIT file", type=["fit"])
@@ -127,15 +127,21 @@ if uploaded_file is not None:
         if data.empty:
             st.write(f"No data for {terrain}")
             continue
-
+    
         fig, ax = plt.subplots(figsize=(12, 4))
         ax.scatter(data['elapsed_sec'], data['w_per_kg'], s=10, alpha=0.3, label='Raw Data')
         ax.plot(data['elapsed_sec'], smooth(data['w_per_kg']), color=colors[terrain], linewidth=2, label='Smoothed')
+    
+        # ここで平均線追加
+        mean_val = data['w_per_kg'].mean()
+        ax.axhline(mean_val, color='black', linestyle='--', linewidth=1.5, label=f'Average: {mean_val:.2f} W/kg')
+    
         ax.set_title(f"W/kg - {terrain.capitalize()}")
         ax.set_xlabel("Elapsed Time (sec)")
         ax.set_ylabel("W/kg")
         ax.legend()
         st.pyplot(fig)
+
 
     # CSVダウンロード
     st.subheader("📁 Export CSV")
