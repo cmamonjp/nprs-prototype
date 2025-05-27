@@ -4,10 +4,13 @@ import numpy as np
 import fitdecode
 import matplotlib.pyplot as plt
 
-st.title("🏃‍♂️ NRRS-P Prototype v5.0")
-st.markdown("FIT file analysis with terrain segmentation and smoothed power per kg visualization")
+st.title("🏃‍♂️ NPRS-P Prototype v0.6")
+st.markdown("Parse FIT files and classify terrain segments automatically")
 
 uploaded_file = st.file_uploader("📂 Upload FIT file", type=["fit"])
+
+def smooth_series(series, window=15):
+    return series.rolling(window=window, min_periods=1, center=True).mean()
 
 def parse_fit_to_df(fit_file):
     records = []
@@ -44,64 +47,53 @@ def parse_fit_to_df(fit_file):
 
     return df
 
-def smooth_series(series, window=10):
-    return series.rolling(window, min_periods=1, center=True).mean()
-
 if uploaded_file is not None:
-    with st.spinner('Analyzing...'):
+    with st.spinner('Processing...'):
         df = parse_fit_to_df(uploaded_file)
 
     if df.empty:
-        st.error("Analysis failed. Check file and columns.")
+        st.error("Failed to parse the file. Check file and columns.")
         st.stop()
 
-    # Input weight
-    weight = st.number_input("Enter your weight (kg):", min_value=30.0, max_value=150.0, value=70.0, step=0.1)
+    weight = st.number_input("⚖️ Enter your weight in kg", min_value=30.0, max_value=200.0, value=70.0, step=0.1)
     df['w_per_kg'] = df['power'] / weight
 
-    st.success("✅ Analysis Complete!")
-
-    st.subheader("Columns:")
-    st.write(df.columns.tolist())
-
-    st.subheader("Raw Data (First 100 rows):")
-    st.dataframe(df.head(100))
-
-    st.subheader("Average Power per kg by Terrain Segment (NRRS-P):")
-    mean_wkg = df.groupby('segment')['w_per_kg'].mean().round(2)
-    st.write(mean_wkg)
-
-    st.subheader("Power per kg Visualization by Terrain Segment")
-
     segments = ['uphill', 'flat', 'downhill']
+    segment_dfs = {}
 
     for seg in segments:
         seg_df = df[df['segment'] == seg].copy()
-        seg_df = seg_df[seg_df['power'] > 0]  # filter out power=0 to avoid noise
+        seg_df = seg_df[seg_df['power'] > 0].reset_index(drop=True)
+        if not seg_df.empty:
+            seg_df['timestamp'] = pd.to_datetime(seg_df['timestamp'])
+            seg_df['elapsed_time_sec'] = (seg_df['timestamp'] - seg_df['timestamp'].iloc[0]).dt.total_seconds()
+            seg_df['w_per_kg_smooth'] = smooth_series(seg_df['w_per_kg'], window=15)
+            segment_dfs[seg] = seg_df
+        else:
+            segment_dfs[seg] = pd.DataFrame()
 
-        if seg_df.empty:
-            st.write(f"No data for segment: {seg}")
-            continue
+    st.subheader("🧮 Average W/kg by Terrain (NRRS-P)")
+    mean_wkg = {seg: segment_dfs[seg]['w_per_kg'].mean() if not segment_dfs[seg].empty else 0 for seg in segments}
+    st.write({k: round(v, 2) for k, v in mean_wkg.items()})
 
-        # Create cumulative time axis in seconds (approximate, based on timestamps)
-        seg_df['timestamp'] = pd.to_datetime(seg_df['timestamp'])
-        seg_df['time_sec'] = (seg_df['timestamp'] - seg_df['timestamp'].iloc[0]).dt.total_seconds()
+    st.subheader("📊 Terrain-wise Power (W/kg) Trend: Scatter & Smoothed Line")
+    fig, axs = plt.subplots(len(segments), 1, figsize=(12, 8), sharex=True)
+    for i, seg in enumerate(segments):
+        ax = axs[i]
+        seg_df = segment_dfs[seg]
+        if not seg_df.empty:
+            ax.scatter(seg_df['elapsed_time_sec'], seg_df['w_per_kg'], s=5, alpha=0.4, label='Raw Data')
+            ax.plot(seg_df['elapsed_time_sec'], seg_df['w_per_kg_smooth'], color='red', label='Smoothed')
+            ax.set_ylabel(f"{seg.capitalize()} W/kg")
+            ax.legend()
+        else:
+            ax.text(0.5, 0.5, f"No data for {seg}", ha='center', va='center')
+            ax.set_ylabel(f"{seg.capitalize()} W/kg")
 
-        # Smoothing W/kg
-        seg_df['w_per_kg_smooth'] = smooth_series(seg_df['w_per_kg'], window=15)
+    axs[-1].set_xlabel("Segment Elapsed Time (seconds)")
+    plt.tight_layout()
+    st.pyplot(fig)
 
-        fig, ax = plt.subplots(figsize=(10,4))
-        ax.scatter(seg_df['time_sec'], seg_df['w_per_kg'], color='lightblue', alpha=0.5, label='Raw Data')
-        ax.plot(seg_df['time_sec'], seg_df['w_per_kg_smooth'], color='red', label='Smoothed Trend', linewidth=2)
-        ax.set_title(f"Power per kg on {seg.capitalize()}")
-        ax.set_xlabel("Elapsed Time (sec)")
-        ax.set_ylabel("Power per kg (W/kg)")
-        ax.legend()
-        ax.grid(True)
-
-        st.pyplot(fig)
-
-    # CSV download
-    st.subheader("Download CSV")
+    st.subheader("📁 Download CSV")
     csv_data = df.to_csv(index=False).encode('utf-8')
-    st.download_button("Download CSV", csv_data, file_name="nrrs_p_parsed_v5.csv", mime="text/csv")
+    st.download_button("Save as CSV", csv_data, file_name="nprs_parsed.csv", mime="text/csv")
