@@ -4,13 +4,10 @@ import numpy as np
 import fitdecode
 import matplotlib.pyplot as plt
 
-st.title("🏃‍♂️ NPRS-P Prototype v0.6")
-st.markdown("Parse FIT files and classify terrain segments automatically")
+st.title("🏃‍♂️ NRRS-P Prototype v0.5")
+st.markdown("Upload a FIT file to analyze power per kg with terrain segmentation and smoothing")
 
 uploaded_file = st.file_uploader("📂 Upload FIT file", type=["fit"])
-
-def smooth_series(series, window=15):
-    return series.rolling(window=window, min_periods=1, center=True).mean()
 
 def parse_fit_to_df(fit_file):
     records = []
@@ -48,56 +45,59 @@ def parse_fit_to_df(fit_file):
     return df
 
 if uploaded_file is not None:
-    with st.spinner('Processing...'):
+    st.sidebar.subheader("Input your weight (kg)")
+    weight = st.sidebar.number_input("Weight (kg)", min_value=30.0, max_value=200.0, value=70.0, step=0.1)
+
+    with st.spinner('Analyzing...'):
         df = parse_fit_to_df(uploaded_file)
 
     if df.empty:
-        st.error("Failed to parse the file. Check file and columns.")
+        st.error("Failed to parse the file or missing required columns.")
         st.stop()
 
-    weight = st.number_input("⚖️ Enter your weight in kg", min_value=30.0, max_value=200.0, value=70.0, step=0.1)
     df['w_per_kg'] = df['power'] / weight
 
-    segments = ['uphill', 'flat', 'downhill']
-    segment_dfs = {}
+    # Calculate elapsed time in seconds from timestamp (assuming timestamp is datetime64)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df = df.sort_values('timestamp').reset_index(drop=True)
+    df['elapsed_time_sec'] = (df['timestamp'] - df['timestamp'].iloc[0]).dt.total_seconds()
 
-    for seg in segments:
-        seg_df = df[df['segment'] == seg].copy()
-        seg_df = seg_df[seg_df['power'] > 0].reset_index(drop=True)
-        if not seg_df.empty:
-            seg_df['timestamp'] = pd.to_datetime(seg_df['timestamp'])
-            seg_df['elapsed_time_sec'] = (seg_df['timestamp'] - seg_df['timestamp'].iloc[0]).dt.total_seconds()
-            seg_df['w_per_kg_smooth'] = smooth_series(seg_df['w_per_kg'], window=15)
-            segment_dfs[seg] = seg_df
-        else:
-            segment_dfs[seg] = pd.DataFrame()
+    window_size = 10
 
-    st.subheader("🧮 Average W/kg by Terrain (NRRS-P)")
-    mean_wkg = {seg: segment_dfs[seg]['w_per_kg'].mean() if not segment_dfs[seg].empty else 0 for seg in segments}
-    st.write({k: round(v, 2) for k, v in mean_wkg.items()})
+    fig, axs = plt.subplots(4, 1, figsize=(12, 16), sharex=True)
 
-    st.subheader("📊 Terrain-wise Power (W/kg) Trend: Scatter & Smoothed Line + Average Line")
-    fig, axs = plt.subplots(len(segments), 1, figsize=(12, 8), sharex=True)
-    for i, seg in enumerate(segments):
-        ax = axs[i]
-        seg_df = segment_dfs[seg]
-        if not seg_df.empty:
-            avg = seg_df['w_per_kg'].mean()
-            ax.scatter(seg_df['elapsed_time_sec'], seg_df['w_per_kg'], s=5, alpha=0.4, label='Raw Data')
-            ax.plot(seg_df['elapsed_time_sec'], seg_df['w_per_kg_smooth'],  color='blue', label='Smoothed')
-            ax.axhline(avg, color='red', linestyle='--', label=f'Average ({avg:.2f})')
-            ax.set_ylabel(f"{seg.capitalize()} W/kg")
-            ax.legend()
-        else:
-            ax.text(0.5, 0.5, f"No data for {seg}", ha='center', va='center')
-            ax.set_ylabel(f"{seg.capitalize()} W/kg")
+    # Smooth the W/kg data for all terrain combined
+    df['w_per_kg_smooth'] = df['w_per_kg'].rolling(window=window_size, min_periods=1).mean()
 
+    # 1. All terrain combined
+    axs[0].scatter(df['elapsed_time_sec'], df['w_per_kg'], alpha=0.3, s=10, label='Raw Data')
+    axs[0].plot(df['elapsed_time_sec'], df['w_per_kg_smooth'], color='blue', linewidth=2, label='Smoothed')
+    axs[0].set_title('All Terrain')
+    axs[0].set_ylabel('Power per kg (W/kg)')
+    axs[0].legend()
+    axs[0].grid(True)
 
-    
-    axs[-1].set_xlabel("Segment Elapsed Time (seconds)")
-    plt.tight_layout()
+    # 2~4. By terrain segments
+    for i, terrain in enumerate(['uphill', 'flat', 'downhill'], start=1):
+        terrain_df = df[df['segment'] == terrain].copy()
+        terrain_df['w_per_kg_smooth'] = terrain_df['w_per_kg'].rolling(window=window_size, min_periods=1).mean()
+
+        axs[i].scatter(terrain_df['elapsed_time_sec'], terrain_df['w_per_kg'], alpha=0.3, s=10, label='Raw Data')
+        axs[i].plot(terrain_df['elapsed_time_sec'], terrain_df['w_per_kg_smooth'], color='red', linewidth=2, label='Smoothed')
+        axs[i].set_title(f'{terrain.capitalize()} Segment')
+        axs[i].set_ylabel('Power per kg (W/kg)')
+        axs[i].legend()
+        axs[i].grid(True)
+
+    axs[3].set_xlabel('Elapsed Time (sec)')
+
     st.pyplot(fig)
 
-    st.subheader("📁 Download CSV")
+    # Display average W/kg by terrain
+    st.subheader("🧮 Average Power per kg by Terrain Segment")
+    avg_wkg = df.groupby('segment')['w_per_kg'].mean().round(2)
+    st.write(avg_wkg)
+
+    # Provide CSV download
     csv_data = df.to_csv(index=False).encode('utf-8')
-    st.download_button("Save as CSV", csv_data, file_name="nprs_parsed.csv", mime="text/csv")
+    st.download_button("Download CSV", csv_data, file_name="nrrs_p_output.csv", mime="text/csv")
