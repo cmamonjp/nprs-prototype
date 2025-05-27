@@ -93,6 +93,7 @@ if uploaded_file is not None:
     
     st.subheader("🧮 Average W/kg by Terrain (NRRS-P)")
     st.dataframe(mean_wkg_df)
+    st.write(mean_wkg_df)
 
     # タイム経過を秒で計算（グラフのX軸に使う）
     df['timestamp'] = pd.to_datetime(df['timestamp'])
