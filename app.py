@@ -84,13 +84,15 @@ if uploaded_file is not None:
         if not seg_df.empty:
             avg = seg_df['w_per_kg'].mean()
             ax.scatter(seg_df['elapsed_time_sec'], seg_df['w_per_kg'], s=5, alpha=0.4, label='Raw Data')
-            ax.plot(seg_df['elapsed_time_sec'], seg_df['w_per_kg_smooth'], color='red', label='Smoothed')
+            ax.plot(seg_df['elapsed_time_sec'], seg_df['w_per_kg_smooth'],  color='blue', label='Smoothed')
             ax.axhline(avg, color='red', linestyle='--', label=f'Average ({avg:.2f})')
             ax.set_ylabel(f"{seg.capitalize()} W/kg")
             ax.legend()
         else:
             ax.text(0.5, 0.5, f"No data for {seg}", ha='center', va='center')
             ax.set_ylabel(f"{seg.capitalize()} W/kg")
+
+
     
     axs[-1].set_xlabel("Segment Elapsed Time (seconds)")
     plt.tight_layout()
