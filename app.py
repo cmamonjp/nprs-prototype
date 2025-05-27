@@ -67,9 +67,6 @@ if uploaded_file is not None:
 
     st.success("✅ Analysis completed!")
 
-    st.subheader("=== Columns ===")
-    st.write(df.columns.tolist())
-
     st.subheader("📊 Data preview (first 100 rows)")
     st.dataframe(df.head(100))
 
